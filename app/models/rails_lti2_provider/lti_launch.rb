@@ -6,10 +6,10 @@ module RailsLti2Provider
 
     def self.check_launch(lti_message)
       tool = Tool.find_by_uuid(lti_message.oauth_consumer_key)
-      authenticator = IMS::LTI::Services::MessageAuthenticator.new(lti_message.launch_url, lti_message.post_params, tool.shared_secret)
-      unless authenticator.valid_signature?
-        raise Unauthorized.new(:invalid_signature)
-      end
+      # Replicating logic from MessageAuthenticator class mergeing in oauth_params to get authentication to work
+      params = lti_message.oauth_params.merge(lti_message.post_params)
+      authenticator = IMS::LTI::Services::MessageAuthenticator.new(lti_message.launch_url, params, tool.shared_secret)
+      raise Unauthorized.new(:invalid_signature) unless authenticator.valid_signature?
       raise Unauthorized.new(:invalid_nonce) if tool.lti_launches.where(nonce: lti_message.oauth_nonce).count > 0
       raise Unauthorized.new(:request_to_old) if  DateTime.strptime(lti_message.oauth_timestamp,'%s') < 5.minutes.ago
       tool.lti_launches.where('created_at > ?', 1.day.ago).delete_all
